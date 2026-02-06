@@ -17,6 +17,45 @@ interface SaylorTweetFeedProps {
   previousPrice: number;
 }
 
+// Classic Saylor tweets as fallback when feed is down
+const CLASSIC_SAYLOR_TWEETS: Tweet[] = [
+  {
+    id: "classic-1",
+    text: "Bitcoin is a bank in cyberspace, run by incorruptible software, offering a global, affordable, simple, & secure savings account to billions of people that don't have the option or desire to run their own hedge fund.",
+    timestamp: new Date("2020-08-01"),
+    hasHopium: true,
+    convictionScore: 95,
+  },
+  {
+    id: "classic-2",
+    text: "If you want to know what it's going to do in the next decade, just look at what it did in the prior decade. #Bitcoin",
+    timestamp: new Date("2021-02-15"),
+    hasHopium: true,
+    convictionScore: 85,
+  },
+  {
+    id: "classic-3",
+    text: "There are no second best options in the 21st century. Bitcoin is the apex property of the human race.",
+    timestamp: new Date("2021-06-10"),
+    hasHopium: true,
+    convictionScore: 100,
+  },
+  {
+    id: "classic-4",
+    text: "Digital gold for digital people in the digital economy.",
+    timestamp: new Date("2020-12-20"),
+    hasHopium: true,
+    convictionScore: 75,
+  },
+  {
+    id: "classic-5",
+    text: "The most important thing you can do is upgrade yourself from Fiat to Bitcoin.",
+    timestamp: new Date("2021-08-05"),
+    hasHopium: true,
+    convictionScore: 90,
+  },
+];
+
 // Sentiment analysis function
 function calculateConvictionScore(text: string): number {
   let score = 30; // Base score
@@ -91,38 +130,65 @@ export default function SaylorTweetFeed({ currentPrice, previousPrice }: SaylorT
           throw new Error(data.message || "Feed parsing failed");
         }
 
-        // Parse and process tweets
-        const parsedTweets: Tweet[] = data.items.map((item: any, index: number) => {
-          // Strip HTML tags and clean up text
-          const text = item.description
-            .replace(/<[^>]*>/g, "")
-            .replace(/&[^;]+;/g, " ")
-            .replace(/\s+/g, " ")
-            .trim();
+        // Parse and process tweets with validation
+        const parsedTweets: Tweet[] = data.items
+          .map((item: any, index: number) => {
+            // VALIDATION: Ensure description or title exists
+            const rawText = item.description || item.title || "";
 
-          // Calculate conviction score
-          const convictionScore = calculateConvictionScore(text);
+            if (!rawText || rawText.trim().length === 0) {
+              console.warn(`[SAYLOR_FEED] Skipping empty item at index ${index}`);
+              return null;
+            }
 
-          // Check for hopium keywords
-          const hopiumKeywords = ["Bitcoin", "Cyber", "Gold"];
-          const hasHopium = hopiumKeywords.some((keyword) =>
-            text.toLowerCase().includes(keyword.toLowerCase())
-          );
+            // Strip HTML tags and clean up text safely
+            const text = rawText
+              .replace(/<[^>]*>/g, "")
+              .replace(/&[^;]+;/g, " ")
+              .replace(/\s+/g, " ")
+              .trim();
 
-          return {
-            id: `${item.pubDate}-${index}`,
-            text,
-            timestamp: new Date(item.pubDate),
-            hasHopium,
-            convictionScore,
-          };
-        });
+            // Skip if text is still empty after cleaning
+            if (text.length === 0) {
+              return null;
+            }
 
-        setTweets(parsedTweets);
-        setRetryCount(0);
+            // Calculate conviction score
+            const convictionScore = calculateConvictionScore(text);
+
+            // Check for hopium keywords
+            const hopiumKeywords = ["Bitcoin", "Cyber", "Gold"];
+            const hasHopium = hopiumKeywords.some((keyword) =>
+              text.toLowerCase().includes(keyword.toLowerCase())
+            );
+
+            return {
+              id: `${item.pubDate || Date.now()}-${index}`,
+              text,
+              timestamp: new Date(item.pubDate || Date.now()),
+              hasHopium,
+              convictionScore,
+            };
+          })
+          .filter((tweet): tweet is Tweet => tweet !== null); // Remove nulls
+
+        // If we got valid tweets, use them
+        if (parsedTweets.length > 0) {
+          setTweets(parsedTweets);
+          setRetryCount(0);
+        } else {
+          throw new Error("No valid tweets in response");
+        }
       } catch (err) {
         console.error("Error fetching Saylor tweets:", err);
         setError("FEED_JAMMED");
+
+        // Use Classic Saylor tweets as fallback
+        if (tweets.length === 0) {
+          console.log("[SAYLOR_FEED] Loading Classic Saylor tweets as fallback");
+          setTweets(CLASSIC_SAYLOR_TWEETS);
+        }
+
         // Retry logic
         if (retryCount < 3) {
           setTimeout(() => {
@@ -143,7 +209,10 @@ export default function SaylorTweetFeed({ currentPrice, previousPrice }: SaylorT
 
   // Calculate SAYLORCOPE indicator
   const calculateSaylorCope = (convictionScore: number): string => {
-    if (currentPrice === 0 || convictionScore === 0) return "N/A";
+    // Handle edge cases: loading state or zero conviction
+    if (currentPrice === 0 || previousPrice === 0) return "LOADING...";
+    if (convictionScore === 0) return "N/A";
+
     const cope = (INITIAL_STATS.averagePrice - currentPrice) / convictionScore;
     return cope.toFixed(2);
   };
@@ -296,6 +365,11 @@ export default function SaylorTweetFeed({ currentPrice, previousPrice }: SaylorT
               <p className="text-red-300/60 text-xs mt-1">
                 &gt; RETRY ATTEMPT: {retryCount + 1}/3
               </p>
+              {tweets.length > 0 && (
+                <p className="text-yellow-300/80 text-xs mt-2">
+                  &gt; DISPLAYING CLASSIC SAYLOR ARCHIVES WHILE RECONNECTING...
+                </p>
+              )}
             </motion.div>
           )}
 
