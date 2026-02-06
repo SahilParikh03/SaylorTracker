@@ -170,7 +170,7 @@ export default function SaylorTweetFeed({ currentPrice, previousPrice }: SaylorT
               convictionScore,
             };
           })
-          .filter((tweet): tweet is Tweet => tweet !== null); // Remove nulls
+          .filter((tweet: Tweet | null): tweet is Tweet => tweet !== null); // Remove nulls
 
         // If we got valid tweets, use them
         if (parsedTweets.length > 0) {

@@ -10,7 +10,7 @@
 
 ## Aesthetic Guidelines
 - UI: Bloomberg Terminal (CRT scanlines, #00FF00 text, #000000 background).
-- Humor: Brainrot micro-animations (CSS-based jitter, laser eye toggles).
+- Humor: Brainrot micro-animations (CSS-based jitter, lasereye toggles).
 - Tech Stack: Next.js (App Router), Tailwind CSS, Framer Motion.
 
 ## WebSocket Integration
